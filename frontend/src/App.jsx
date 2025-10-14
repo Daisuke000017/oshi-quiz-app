@@ -71,7 +71,11 @@ function HomePage() {
 
   useEffect(() => {
     fetch(`${API_BASE}/quizzes`).then(r => r.json()).then(quizzesData => {
-      setQuizzes(quizzesData)
+      // 【推しの子】タグのクイズだけをフィルタリング
+      const oshiNokoQuizzes = quizzesData.filter(quiz =>
+        quiz.oshi_tag && quiz.oshi_tag.name === '【推しの子】'
+      )
+      setQuizzes(oshiNokoQuizzes)
       setLoading(false)
     })
   }, [])
