@@ -117,10 +117,36 @@ with app.app_context():
         db.create_all()
         print('✅ データベースの初期化が完了しました')
 
-        # テーブルが空の場合のみシードデータを投入
+        # シードデータの投入処理
         try:
             count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
-            if count == 0:
+
+            # FORCE_SEED環境変数がtrueの場合、既存データを削除してシードデータを投入
+            if os.environ.get('FORCE_SEED') == 'true':
+                print(f'⚠️  FORCE_SEED=trueが設定されています。既存のクイズデータ（{count}件）を削除してシードデータを投入します...')
+
+                # 既存データを削除（外部キー制約を考慮した順序で削除）
+                try:
+                    db.session.execute(db.delete(UserAnswer))
+                    db.session.execute(db.delete(QuizAttempt))
+                    db.session.execute(db.delete(Choice))
+                    db.session.execute(db.delete(Question))
+                    db.session.execute(db.delete(Quiz))
+                    db.session.commit()
+                    print('  ✓ 既存のクイズデータを削除しました')
+                except Exception as e:
+                    print(f'  ⚠ データ削除中にエラー: {e}')
+                    db.session.rollback()
+
+                # シードデータを投入
+                try:
+                    import seed_data
+                    seed_data.seed_data()
+                    print('✅ シードデータの投入が完了しました')
+                except Exception as e:
+                    print(f'❌ シードデータの投入中にエラーが発生しました: {e}')
+
+            elif count == 0:
                 print('データベースが空です。シードデータを投入します...')
                 try:
                     import seed_data
