@@ -137,7 +137,8 @@ with app.app_context():
                     )
                 ).scalar()
 
-                if oshi_quiz_count == 0 and os.environ.get('ADD_OSHI_SEED') == 'true':
+                # 推しの子クイズが存在しない場合、自動的に追加
+                if oshi_quiz_count == 0:
                     print(f'既存のクイズデータ（{count}件）が見つかりました。推しの子クイズのシードデータを追加します...')
                     try:
                         import seed_data
