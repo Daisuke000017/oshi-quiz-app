@@ -38,54 +38,64 @@ db.init_app(app)
 with app.app_context():
     from src.models.quiz import Quiz, Question, Choice, QuizAttempt, UserAnswer, OshiTag
 
-    # 本番環境で初回起動時、古いテーブル構造をリセット
-    # RESET_DB環境変数がtrueの場合のみ実行
-    if os.environ.get('RESET_DB') == 'true':
-        print('⚠️  RESET_DB=trueが設定されています。推しの子クイズアプリのテーブルをリセットします...')
+    # データベースのマイグレーション処理
+    # テーブルを削除せずに、不足しているカラムを追加する
+    try:
+        from sqlalchemy import inspect, text
+        from src.models.user import User
 
-        # 推しの子クイズアプリのテーブルだけを削除（他のアプリのテーブルは保持）
-        try:
-            # 依存関係のある順番で削除
-            from src.models.user import User
+        inspector = inspect(db.engine)
 
-            # テーブルが存在する場合のみ削除
-            tables_to_drop = [
-                UserAnswer.__table__,
-                QuizAttempt.__table__,
-                Choice.__table__,
-                Question.__table__,
-                Quiz.__table__,
-                OshiTag.__table__,
-                User.__table__
-            ]
+        # quizzesテーブルが存在するかチェック
+        if inspector.has_table('quizzes'):
+            print('既存のquizzesテーブルを確認しています...')
+            columns = [col['name'] for col in inspector.get_columns('quizzes')]
 
-            for table in tables_to_drop:
-                try:
-                    table.drop(db.engine, checkfirst=True)
-                    print(f'  ✓ テーブル {table.name} を削除しました')
-                except Exception as e:
-                    print(f'  ⚠ テーブル {table.name} の削除をスキップ: {e}')
+            # 不足しているカラムを追加
+            missing_columns = []
+            required_columns = {
+                'creator_id': 'INTEGER',
+                'oshi_tag_id': 'INTEGER',
+                'difficulty': 'VARCHAR(20)',
+                'play_count': 'INTEGER DEFAULT 0',
+                'average_score': 'FLOAT DEFAULT 0.0',
+                'rating': 'FLOAT DEFAULT 0.0',
+                'rating_count': 'INTEGER DEFAULT 0',
+                'is_public': 'BOOLEAN DEFAULT TRUE',
+                'created_at': 'TIMESTAMP',
+                'updated_at': 'TIMESTAMP'
+            }
 
-            # 新しいスキーマでテーブルを再作成
-            db.create_all()
-            print('✅ テーブルの再作成が完了しました')
+            for col_name, col_type in required_columns.items():
+                if col_name not in columns:
+                    missing_columns.append((col_name, col_type))
 
-            # シードデータを投入
-            print('シードデータを投入します...')
-            try:
-                import seed_data
-                seed_data.seed_data()
-                print('✅ シードデータの投入が完了しました')
-            except Exception as e:
-                print(f'❌ シードデータの投入中にエラーが発生しました: {e}')
+            if missing_columns:
+                print(f'不足しているカラムを追加します: {[col[0] for col in missing_columns]}')
+                for col_name, col_type in missing_columns:
+                    try:
+                        with db.engine.connect() as conn:
+                            # デフォルト値を設定してカラム追加
+                            if col_name == 'creator_id':
+                                conn.execute(text(f'ALTER TABLE quizzes ADD COLUMN {col_name} {col_type}'))
+                                # 既存レコードには仮のcreator_idを設定
+                                conn.execute(text('UPDATE quizzes SET creator_id = 1 WHERE creator_id IS NULL'))
+                                conn.commit()
+                            elif col_name == 'oshi_tag_id':
+                                conn.execute(text(f'ALTER TABLE quizzes ADD COLUMN {col_name} {col_type}'))
+                                conn.commit()
+                            else:
+                                conn.execute(text(f'ALTER TABLE quizzes ADD COLUMN {col_name} {col_type}'))
+                                conn.commit()
+                        print(f'  ✓ カラム {col_name} を追加しました')
+                    except Exception as e:
+                        print(f'  ⚠ カラム {col_name} の追加をスキップ: {e}')
+            else:
+                print('quizzesテーブルは最新の構造です')
 
-        except Exception as e:
-            print(f'❌ テーブルのリセット中にエラーが発生しました: {e}')
-            # エラーが発生してもアプリは起動を続ける
-            db.create_all()
-    else:
-        # 通常起動時はテーブルを作成するのみ
+        # テーブルが存在しない場合は作成
         db.create_all()
+        print('✅ データベースの初期化が完了しました')
 
         # テーブルが空の場合のみシードデータを投入
         try:
@@ -98,8 +108,15 @@ with app.app_context():
                     print('✅ シードデータの投入が完了しました')
                 except Exception as e:
                     print(f'シードデータの投入中にエラーが発生しました: {e}')
+            else:
+                print(f'既存のクイズデータが {count} 件見つかりました')
         except Exception as e:
             print(f'データベースの確認中にエラーが発生しました: {e}')
+
+    except Exception as e:
+        print(f'データベースのマイグレーション中にエラーが発生しました: {e}')
+        # エラーが発生してもテーブルは作成する
+        db.create_all()
 
 # ヘルスチェックエンドポイント
 @app.route('/')
