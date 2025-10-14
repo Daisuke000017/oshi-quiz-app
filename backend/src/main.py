@@ -46,14 +46,9 @@ with app.app_context():
 
         inspector = inspect(db.engine)
 
-        # quizzesテーブルが存在するかチェック
-        if inspector.has_table('quizzes'):
-            print('既存のquizzesテーブルを確認しています...')
-            columns = [col['name'] for col in inspector.get_columns('quizzes')]
-
-            # 不足しているカラムを追加
-            missing_columns = []
-            required_columns = {
+        # 全テーブルのスキーマ定義
+        table_schemas = {
+            'quizzes': {
                 'creator_id': 'INTEGER',
                 'oshi_tag_id': 'INTEGER',
                 'difficulty': 'VARCHAR(20)',
@@ -64,34 +59,59 @@ with app.app_context():
                 'is_public': 'BOOLEAN DEFAULT TRUE',
                 'created_at': 'TIMESTAMP',
                 'updated_at': 'TIMESTAMP'
+            },
+            'questions': {
+                'order_index': 'INTEGER DEFAULT 0',
+                'explanation': 'TEXT',
+                'created_at': 'TIMESTAMP'
+            },
+            'choices': {
+                'order_index': 'INTEGER DEFAULT 0',
+                'is_correct': 'BOOLEAN DEFAULT FALSE'
+            },
+            'oshi_tags': {
+                'category': 'VARCHAR(50)',
+                'description': 'TEXT',
+                'created_at': 'TIMESTAMP'
+            },
+            'users': {
+                'created_at': 'TIMESTAMP'
             }
+        }
 
-            for col_name, col_type in required_columns.items():
-                if col_name not in columns:
-                    missing_columns.append((col_name, col_type))
+        # 各テーブルのカラムをチェック・追加
+        for table_name, required_columns in table_schemas.items():
+            if inspector.has_table(table_name):
+                print(f'既存の{table_name}テーブルを確認しています...')
+                columns = [col['name'] for col in inspector.get_columns(table_name)]
 
-            if missing_columns:
-                print(f'不足しているカラムを追加します: {[col[0] for col in missing_columns]}')
-                for col_name, col_type in missing_columns:
-                    try:
-                        with db.engine.connect() as conn:
-                            # デフォルト値を設定してカラム追加
-                            if col_name == 'creator_id':
-                                conn.execute(text(f'ALTER TABLE quizzes ADD COLUMN {col_name} {col_type}'))
-                                # 既存レコードには仮のcreator_idを設定
-                                conn.execute(text('UPDATE quizzes SET creator_id = 1 WHERE creator_id IS NULL'))
+                missing_columns = []
+                for col_name, col_type in required_columns.items():
+                    if col_name not in columns:
+                        missing_columns.append((col_name, col_type))
+
+                if missing_columns:
+                    print(f'  不足しているカラムを追加します: {[col[0] for col in missing_columns]}')
+                    for col_name, col_type in missing_columns:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}'))
+
+                                # 特定のカラムにデフォルト値を設定
+                                if table_name == 'quizzes':
+                                    if col_name == 'creator_id':
+                                        conn.execute(text('UPDATE quizzes SET creator_id = 1 WHERE creator_id IS NULL'))
+                                    elif col_name == 'oshi_tag_id':
+                                        conn.execute(text('UPDATE quizzes SET oshi_tag_id = 1 WHERE oshi_tag_id IS NULL'))
+                                    elif col_name == 'difficulty':
+                                        conn.execute(text("UPDATE quizzes SET difficulty = 'intermediate' WHERE difficulty IS NULL"))
+
                                 conn.commit()
-                            elif col_name == 'oshi_tag_id':
-                                conn.execute(text(f'ALTER TABLE quizzes ADD COLUMN {col_name} {col_type}'))
-                                conn.commit()
-                            else:
-                                conn.execute(text(f'ALTER TABLE quizzes ADD COLUMN {col_name} {col_type}'))
-                                conn.commit()
-                        print(f'  ✓ カラム {col_name} を追加しました')
-                    except Exception as e:
-                        print(f'  ⚠ カラム {col_name} の追加をスキップ: {e}')
-            else:
-                print('quizzesテーブルは最新の構造です')
+                            print(f'    ✓ カラム {col_name} を追加しました')
+                        except Exception as e:
+                            print(f'    ⚠ カラム {col_name} の追加をスキップ: {e}')
+                else:
+                    print(f'  {table_name}テーブルは最新の構造です')
 
         # テーブルが存在しない場合は作成
         db.create_all()
