@@ -108,7 +108,7 @@ function HomePage() {
         <div className="flex justify-center mb-6">
           <div className="relative w-full max-w-md">
             <img
-              src="/main-sp.png"
+              src={`${import.meta.env.BASE_URL}main-sp.png`}
               alt="【推しの子】メインビジュアル"
               className="w-full h-auto rounded-2xl shadow-2xl"
             />
