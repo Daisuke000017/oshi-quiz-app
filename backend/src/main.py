@@ -38,6 +38,16 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+    # 本番環境でデータベースが空の場合、自動的にシードデータを投入
+    from src.models.quiz import Quiz
+    if Quiz.query.count() == 0:
+        print('データベースが空です。シードデータを投入します...')
+        try:
+            import seed_data
+            seed_data.seed_data()
+        except Exception as e:
+            print(f'シードデータの投入中にエラーが発生しました: {e}')
+
 # ヘルスチェックエンドポイント
 @app.route('/')
 def health_check():
