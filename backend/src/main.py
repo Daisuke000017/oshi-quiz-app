@@ -121,32 +121,7 @@ with app.app_context():
         try:
             count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
 
-            # FORCE_SEED環境変数がtrueの場合、既存データを削除してシードデータを投入
-            if os.environ.get('FORCE_SEED') == 'true':
-                print(f'⚠️  FORCE_SEED=trueが設定されています。既存のクイズデータ（{count}件）を削除してシードデータを投入します...')
-
-                # 既存データを削除（外部キー制約を考慮した順序で削除）
-                try:
-                    db.session.execute(db.delete(UserAnswer))
-                    db.session.execute(db.delete(QuizAttempt))
-                    db.session.execute(db.delete(Choice))
-                    db.session.execute(db.delete(Question))
-                    db.session.execute(db.delete(Quiz))
-                    db.session.commit()
-                    print('  ✓ 既存のクイズデータを削除しました')
-                except Exception as e:
-                    print(f'  ⚠ データ削除中にエラー: {e}')
-                    db.session.rollback()
-
-                # シードデータを投入
-                try:
-                    import seed_data
-                    seed_data.seed_data()
-                    print('✅ シードデータの投入が完了しました')
-                except Exception as e:
-                    print(f'❌ シードデータの投入中にエラーが発生しました: {e}')
-
-            elif count == 0:
+            if count == 0:
                 print('データベースが空です。シードデータを投入します...')
                 try:
                     import seed_data
@@ -155,7 +130,23 @@ with app.app_context():
                 except Exception as e:
                     print(f'シードデータの投入中にエラーが発生しました: {e}')
             else:
-                print(f'既存のクイズデータが {count} 件見つかりました')
+                # 既存データがある場合、推しの子クイズが存在するかチェック
+                oshi_quiz_count = db.session.execute(
+                    db.select(db.func.count()).select_from(Quiz).where(
+                        Quiz.title.like('%推しの子%')
+                    )
+                ).scalar()
+
+                if oshi_quiz_count == 0 and os.environ.get('ADD_OSHI_SEED') == 'true':
+                    print(f'既存のクイズデータ（{count}件）が見つかりました。推しの子クイズのシードデータを追加します...')
+                    try:
+                        import seed_data
+                        seed_data.seed_data()
+                        print('✅ 推しの子クイズのシードデータを追加しました')
+                    except Exception as e:
+                        print(f'❌ シードデータの追加中にエラーが発生しました: {e}')
+                else:
+                    print(f'既存のクイズデータが {count} 件見つかりました（推しの子クイズ: {oshi_quiz_count}件）')
         except Exception as e:
             print(f'データベースの確認中にエラーが発生しました: {e}')
 
