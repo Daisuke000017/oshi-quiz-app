@@ -45,9 +45,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # データベースの初期化
 db.init_app(app)
 
-# 起動時の初期化処理を最小限に（タイムアウト対策）
+# 起動時の初期化処理
 def init_db():
-    """データベースを初期化する（テーブル作成のみ）"""
+    """データベースを初期化する（テーブル作成とシードデータ投入）"""
     try:
         from src.models.quiz import Quiz, Question, Choice, QuizAttempt, UserAnswer, OshiTag
         from src.models.user import User
@@ -56,12 +56,33 @@ def init_db():
         # テーブルを作成（存在しない場合のみ）
         db.create_all()
         print('✅ データベーステーブルの作成が完了しました')
+
+        # シードデータの投入（データが空の場合のみ）
+        try:
+            count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
+            if count == 0:
+                print('シードデータを投入中...')
+                import sys
+                import os
+                # seed_data.pyのパスを追加
+                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                sys.path.insert(0, backend_dir)
+
+                import seed_data
+                seed_data.seed_data()
+                print('✅ シードデータの投入が完了しました')
+            else:
+                print(f'既存のクイズデータ: {count}件')
+        except Exception as e:
+            print(f'⚠ シードデータの投入をスキップ: {e}')
+            import traceback
+            traceback.print_exc()
     except Exception as e:
         print(f'⚠ データベース初期化エラー: {e}')
         import traceback
         traceback.print_exc()
 
-# アプリ起動時にデータベーステーブルを作成（シードデータは別途投入）
+# アプリ起動時にデータベースを初期化
 with app.app_context():
     init_db()
 
