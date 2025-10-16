@@ -73,24 +73,25 @@ def ensure_seed_data():
     if _seed_initialized:
         return
 
-    try:
-        from src.models.quiz import Quiz
-        count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
-        if count == 0:
-            print('シードデータを投入中...')
-            import sys
-            backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            sys.path.insert(0, backend_dir)
+    with app.app_context():
+        try:
+            from src.models.quiz import Quiz
+            count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
+            if count == 0:
+                print('シードデータを投入中...')
+                import sys
+                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                sys.path.insert(0, backend_dir)
 
-            import seed_data
-            seed_data.seed_data()
-            print('✅ シードデータの投入が完了しました')
-        _seed_initialized = True
-    except Exception as e:
-        print(f'⚠ シードデータの投入エラー: {e}')
-        import traceback
-        traceback.print_exc()
-        _seed_initialized = True  # エラーでも再試行しない
+                import seed_data
+                seed_data.seed_data()
+                print('✅ シードデータの投入が完了しました')
+            _seed_initialized = True
+        except Exception as e:
+            print(f'⚠ シードデータの投入エラー: {e}')
+            import traceback
+            traceback.print_exc()
+            _seed_initialized = True  # エラーでも再試行しない
 
 # ヘルスチェックエンドポイント
 @app.route('/')
