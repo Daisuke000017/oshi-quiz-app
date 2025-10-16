@@ -25,7 +25,16 @@ if database_url:
     # Render.comのPostgreSQL URLを修正
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+    # SSL設定を追加（PostgreSQL接続エラー対策）
+    if '?' not in database_url:
+        database_url += '?sslmode=require'
+
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
 else:
     # ローカル開発環境ではSQLiteを使用
     db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'database', 'app.db'))
