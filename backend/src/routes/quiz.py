@@ -32,19 +32,23 @@ def create_tag():
 # クイズ一覧取得
 @quiz_bp.route('/quizzes', methods=['GET'])
 def get_quizzes():
+    # 初回リクエスト時にシードデータを投入
+    from src.main import ensure_seed_data
+    ensure_seed_data()
+
     category = request.args.get('category')
     difficulty = request.args.get('difficulty')
     tag_id = request.args.get('tag_id')
-    
+
     query = Quiz.query.filter_by(is_public=True)
-    
+
     if category:
         query = query.join(OshiTag).filter(OshiTag.category == category)
     if difficulty:
         query = query.filter_by(difficulty=difficulty)
     if tag_id:
         query = query.filter_by(oshi_tag_id=tag_id)
-    
+
     quizzes = query.order_by(Quiz.created_at.desc()).all()
     return jsonify([quiz.to_dict() for quiz in quizzes])
 

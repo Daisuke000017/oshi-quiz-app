@@ -45,46 +45,52 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # データベースの初期化
 db.init_app(app)
 
-# 起動時の初期化処理
+# 起動時の初期化処理（テーブル作成のみ、高速化）
 def init_db():
-    """データベースを初期化する（テーブル作成とシードデータ投入）"""
+    """データベーステーブルを作成する"""
     try:
         from src.models.quiz import Quiz, Question, Choice, QuizAttempt, UserAnswer, OshiTag
         from src.models.user import User
 
         print('データベーステーブルを作成中...')
-        # テーブルを作成（存在しない場合のみ）
         db.create_all()
         print('✅ データベーステーブルの作成が完了しました')
-
-        # シードデータの投入（データが空の場合のみ）
-        try:
-            count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
-            if count == 0:
-                print('シードデータを投入中...')
-                import sys
-                import os
-                # seed_data.pyのパスを追加
-                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                sys.path.insert(0, backend_dir)
-
-                import seed_data
-                seed_data.seed_data()
-                print('✅ シードデータの投入が完了しました')
-            else:
-                print(f'既存のクイズデータ: {count}件')
-        except Exception as e:
-            print(f'⚠ シードデータの投入をスキップ: {e}')
-            import traceback
-            traceback.print_exc()
     except Exception as e:
         print(f'⚠ データベース初期化エラー: {e}')
         import traceback
         traceback.print_exc()
 
-# アプリ起動時にデータベースを初期化
+# アプリ起動時にデータベーステーブルを作成（シードデータは初回リクエスト時）
 with app.app_context():
     init_db()
+
+# シードデータ投入フラグ
+_seed_initialized = False
+
+def ensure_seed_data():
+    """初回リクエスト時にシードデータを投入（自動実行）"""
+    global _seed_initialized
+    if _seed_initialized:
+        return
+
+    try:
+        from src.models.quiz import Quiz
+        count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
+        if count == 0:
+            print('シードデータを投入中...')
+            import sys
+            backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            sys.path.insert(0, backend_dir)
+
+            import seed_data
+            seed_data.seed_data()
+            print('✅ シードデータの投入が完了しました')
+        _seed_initialized = True
+    except Exception as e:
+        print(f'⚠ シードデータの投入エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        _seed_initialized = True  # エラーでも再試行しない
 
 # ヘルスチェックエンドポイント
 @app.route('/')
