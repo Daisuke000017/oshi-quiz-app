@@ -60,38 +60,9 @@ def init_db():
         import traceback
         traceback.print_exc()
 
-# アプリ起動時にデータベーステーブルを作成（シードデータは初回リクエスト時）
+# アプリ起動時にデータベーステーブルを作成のみ（シードデータは手動）
 with app.app_context():
     init_db()
-
-# シードデータ投入フラグ
-_seed_initialized = False
-
-def ensure_seed_data():
-    """初回リクエスト時にシードデータを投入（自動実行）"""
-    global _seed_initialized
-    if _seed_initialized:
-        return
-
-    with app.app_context():
-        try:
-            from src.models.quiz import Quiz
-            count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
-            if count == 0:
-                print('シードデータを投入中...')
-                import sys
-                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                sys.path.insert(0, backend_dir)
-
-                import seed_data
-                seed_data.seed_data()
-                print('✅ シードデータの投入が完了しました')
-            _seed_initialized = True
-        except Exception as e:
-            print(f'⚠ シードデータの投入エラー: {e}')
-            import traceback
-            traceback.print_exc()
-            _seed_initialized = True  # エラーでも再試行しない
 
 # ヘルスチェックエンドポイント
 @app.route('/')
@@ -114,9 +85,14 @@ def api_info():
 # シードデータ投入エンドポイント（デプロイ後に一度だけ実行）
 @app.route('/api/seed', methods=['POST'])
 def seed_data_endpoint():
-    """シードデータを投入する（管理者用）"""
+    """
+    シードデータを投入する（管理者用）
+
+    100問を5問ずつバッチ処理で投入します。
+    無料プランのメモリ制約に対応しています。
+    """
     try:
-        from src.models.quiz import Quiz
+        from src.models.quiz import Quiz, Question
 
         # 既にデータが存在する場合はスキップ
         count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
@@ -127,22 +103,25 @@ def seed_data_endpoint():
                 'count': count
             }, 200
 
-        # シードデータを投入
+        # シードデータを投入（バッチ処理）
         import sys
         import os
         backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         sys.path.insert(0, backend_dir)
 
         import seed_data
+        print('📚 100問版シードデータの投入を開始します（バッチ処理）')
         seed_data.seed_data()
 
         # 投入後のカウント
         new_count = db.session.execute(db.select(db.func.count()).select_from(Quiz)).scalar()
+        question_count = db.session.execute(db.select(db.func.count()).select_from(Question)).scalar()
 
         return {
             'status': 'success',
-            'message': 'シードデータの投入が完了しました',
-            'count': new_count
+            'message': '100問版シードデータの投入が完了しました',
+            'quiz_count': new_count,
+            'question_count': question_count
         }, 200
     except Exception as e:
         import traceback

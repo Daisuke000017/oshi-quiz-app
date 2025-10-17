@@ -1,19 +1,25 @@
 """
-軽量版シードデータ - 無料インスタンス用
-推しの子クイズ（30問）
+100問版シードデータ - 無料プラン対応（バッチ処理）
+推しの子クイズ（100問）を段階的に投入
 """
-import sys
 import os
+import sys
+import json
+import time
 
 # Flaskアプリのコンテキストをインポート
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.models.user import db, User
 from src.models.quiz import Quiz, Question, Choice, OshiTag
-from datetime import datetime
 
-def seed_data():
-    """軽量版シードデータを投入（30問）"""
+def seed_data_batch(batch_size=5):
+    """
+    バッチ処理でシードデータを投入（無料プラン対応）
+
+    Args:
+        batch_size: 一度に処理する問題数（デフォルト5問）
+    """
 
     # ユーザーを作成
     admin = User.query.filter_by(username='admin').first()
@@ -24,6 +30,7 @@ def seed_data():
         )
         db.session.add(admin)
         db.session.commit()
+        print('✅ 管理者ユーザーを作成しました')
 
     # 推しの子タグを作成
     oshinoko_tag = OshiTag.query.filter_by(name='推しの子').first()
@@ -35,299 +42,113 @@ def seed_data():
         )
         db.session.add(oshinoko_tag)
         db.session.commit()
+        print('✅ 推しの子タグを作成しました')
 
-    # クイズ1: 初級編（10問）
-    quiz1 = Quiz(
-        creator_id=admin.id,
-        title='【推しの子】初級クイズ',
-        description='主要キャラクターと物語の基本に関するクイズ',
-        oshi_tag_id=oshinoko_tag.id,
-        difficulty='beginner',
-        is_public=True
-    )
-    db.session.add(quiz1)
-    db.session.flush()
+    # JSONファイルから問題データを読み込み
+    json_path = os.path.join(os.path.dirname(__file__), 'oshinoko_quiz_data.json')
 
-    # クイズ1の問題
-    questions_quiz1 = [
-        {
-            'question_text': '伝説のアイドル・星野アイが所属していたアイドルグループの名前は？',
-            'choices': ['A小町', 'B小町', '苺プロダクション', '劇団ララライ'],
-            'correct_index': 1,
-            'explanation': '星野アイが不動のセンターとして活躍していたアイドルグループが「B小町」です。'
-        },
-        {
-            'question_text': '主人公アクアの前世の職業は？',
-            'choices': ['産婦人科医', '映画監督', 'プロデューサー', '小児科医'],
-            'correct_index': 0,
-            'explanation': 'アクアの前世は、地方の病院に勤務する産婦人科医・雨宮吾郎です。'
-        },
-        {
-            'question_text': 'アクアの双子の妹の名前は？',
-            'choices': ['星野アイ', '星野ルビー', '黒川あかね', '有馬かな'],
-            'correct_index': 1,
-            'explanation': 'アクアの双子の妹は星野ルビーです。'
-        },
-        {
-            'question_text': '星野アイが所属していた芸能事務所は？',
-            'choices': ['苺プロダクション', 'ベリープロ', 'スターライト', 'ララライ事務所'],
-            'correct_index': 0,
-            'explanation': '星野アイは苺プロダクションに所属していました。'
-        },
-        {
-            'question_text': 'アクアの本名は？',
-            'choices': ['雨宮吾郎', '星野アクアマリン', '黒川涼', '五反田泰志'],
-            'correct_index': 1,
-            'explanation': 'アクアの本名は星野アクアマリンです。'
-        },
-        {
-            'question_text': '新生B小町のセンターを務めるのは誰？',
-            'choices': ['有馬かな', '星野ルビー', '黒川あかね', 'MEMちょ'],
-            'correct_index': 1,
-            'explanation': '新生B小町のセンターは星野ルビーです。'
-        },
-        {
-            'question_text': 'アクアが最初に出演した映画のジャンルは？',
-            'choices': ['恋愛映画', 'ホラー映画', 'アクション映画', 'コメディ映画'],
-            'correct_index': 1,
-            'explanation': 'アクアが最初に出演したのはホラー映画です。'
-        },
-        {
-            'question_text': '有馬かなの職業は？',
-            'choices': ['アイドル', '女優', 'YouTuber', '歌手'],
-            'correct_index': 1,
-            'explanation': '有馬かなは元天才子役の女優です。'
-        },
-        {
-            'question_text': 'MEMちょの職業は？',
-            'choices': ['アイドル', 'YouTuber', '女優', 'モデル'],
-            'correct_index': 1,
-            'explanation': 'MEMちょはYouTuberです。'
-        },
-        {
-            'question_text': '物語の舞台となる主な場所は？',
-            'choices': ['大阪', '東京', '名古屋', '福岡'],
-            'correct_index': 1,
-            'explanation': '物語の舞台は主に東京です。'
-        }
-    ]
+    if not os.path.exists(json_path):
+        print(f'❌ エラー: {json_path} が見つかりません')
+        return
 
-    for i, q_data in enumerate(questions_quiz1):
-        question = Question(
-            quiz_id=quiz1.id,
-            question_text=q_data['question_text'],
-            question_type='multiple_choice',
-            order_index=i,
-            explanation=q_data['explanation']
-        )
-        db.session.add(question)
-        db.session.flush()
+    with open(json_path, 'r', encoding='utf-8') as f:
+        quiz_data = json.load(f)
 
-        for j, choice_text in enumerate(q_data['choices']):
-            choice = Choice(
-                question_id=question.id,
-                choice_text=choice_text,
-                is_correct=(j == q_data['correct_index']),
-                order_index=j
+    print('📚 【推しの子】クイズデータを投入中...')
+    print(f'   バッチサイズ: {batch_size}問ずつ処理')
+
+    quiz_count = 0
+    question_count = 0
+
+    # 各難易度のクイズを作成
+    for part in quiz_data:
+        difficulty = part['difficulty']
+        part_name = part['name']
+
+        # 各セットをクイズとして作成
+        for set_data in part['sets']:
+            set_title = set_data['title']
+            questions = set_data['questions']
+
+            # クイズタイトルを生成
+            quiz_title = f'【推しの子】{part_name} - {set_title}'
+
+            # クイズの説明を生成
+            quiz_description = f'{part_name}の{set_title}に関する問題です。全{len(questions)}問。'
+
+            # クイズを作成
+            quiz = Quiz(
+                creator_id=admin.id,
+                title=quiz_title,
+                description=quiz_description,
+                oshi_tag_id=oshinoko_tag.id,
+                difficulty=difficulty,
+                is_public=True
             )
-            db.session.add(choice)
+            db.session.add(quiz)
+            db.session.flush()
+            quiz_count += 1
 
-    # クイズ2: 中級編（10問）
-    quiz2 = Quiz(
-        creator_id=admin.id,
-        title='【推しの子】中級クイズ',
-        description='恋愛リアリティショーと舞台編のクイズ',
-        oshi_tag_id=oshinoko_tag.id,
-        difficulty='intermediate',
-        is_public=True
-    )
-    db.session.add(quiz2)
-    db.session.flush()
+            print(f'   📝 クイズ作成: {quiz_title} ({len(questions)}問)')
 
-    # クイズ2の問題
-    questions_quiz2 = [
-        {
-            'question_text': 'アクアが参加した恋愛リアリティショーの名前は？',
-            'choices': ['今夜、本気で恋します', '恋の駆け引き', 'ラブ・ゲーム', '真剣恋愛'],
-            'correct_index': 0,
-            'explanation': 'アクアが参加した恋愛リアリティショーは「今夜、本気で恋します（今ガチ）」です。'
-        },
-        {
-            'question_text': '今ガチで黒川あかねが演じた役柄は？',
-            'choices': ['優等生', '悪役', '天然キャラ', '星野アイ'],
-            'correct_index': 3,
-            'explanation': '黒川あかねは星野アイを完璧に演じました。'
-        },
-        {
-            'question_text': '2.5次元舞台で上演された作品は？',
-            'choices': ['銀河鉄道の夜', '東京ブレイド', 'ロミオとジュリエット', '星空のメモリア'],
-            'correct_index': 1,
-            'explanation': '2.5次元舞台で上演されたのは「東京ブレイド」です。'
-        },
-        {
-            'question_text': '東京ブレイドでアクアが演じた役は？',
-            'choices': ['主人公', '悪役', '脇役の刀鍛冶', 'ヒロイン'],
-            'correct_index': 2,
-            'explanation': 'アクアは脇役の刀鍛冶を演じました。'
-        },
-        {
-            'question_text': '黒川あかねの特技は？',
-            'choices': ['歌', 'ダンス', '演技分析', '料理'],
-            'correct_index': 2,
-            'explanation': '黒川あかねの特技は観察眼と演技分析です。'
-        },
-        {
-            'question_text': '有馬かながアクアを「あくあく」と呼ぶ理由は？',
-            'choices': ['本名から', '幼馴染だから', '子役時代の共演から', '趣味が同じ'],
-            'correct_index': 2,
-            'explanation': '有馬かなとアクアは子役時代に共演しており、その時から「あくあく」と呼んでいます。'
-        },
-        {
-            'question_text': 'ルビーがアイドルを目指すきっかけとなった人物は？',
-            'choices': ['星野アイ', '有馬かな', 'MEMちょ', 'さりな'],
-            'correct_index': 0,
-            'explanation': 'ルビーは母・星野アイに憧れてアイドルを目指しました。'
-        },
-        {
-            'question_text': '苺プロダクションの社長は誰？',
-            'choices': ['鏑木勝也', '斎藤ミヤコ', '鷲見ゆき', '五反田泰志'],
-            'correct_index': 1,
-            'explanation': '苺プロダクションの社長は斎藤ミヤコです。'
-        },
-        {
-            'question_text': 'アクアの復讐の対象となっている人物は？',
-            'choices': ['五反田泰志', 'カミキヒカル', '鏑木勝也', '上原清十郎'],
-            'correct_index': 1,
-            'explanation': 'アクアの復讐の対象はカミキヒカルです。'
-        },
-        {
-            'question_text': '新生B小町のメンバー数は？',
-            'choices': ['3人', '4人', '5人', '6人'],
-            'correct_index': 0,
-            'explanation': '新生B小町はルビー、かな、MEMちょの3人です。'
-        }
-    ]
+            # 問題をバッチ処理で作成
+            total_questions = len(questions)
+            for batch_start in range(0, total_questions, batch_size):
+                batch_end = min(batch_start + batch_size, total_questions)
+                batch_questions = questions[batch_start:batch_end]
 
-    for i, q_data in enumerate(questions_quiz2):
-        question = Question(
-            quiz_id=quiz2.id,
-            question_text=q_data['question_text'],
-            question_type='multiple_choice',
-            order_index=i,
-            explanation=q_data['explanation']
-        )
-        db.session.add(question)
-        db.session.flush()
+                # バッチ内の各問題を処理
+                for q_index, q_data in enumerate(batch_questions, batch_start + 1):
+                    question_text = q_data['question_text']
+                    choices_list = q_data['choices']
+                    correct_answer = q_data['correct_answer']  # A, B, C, D
+                    explanation = q_data.get('explanation', '')
 
-        for j, choice_text in enumerate(q_data['choices']):
-            choice = Choice(
-                question_id=question.id,
-                choice_text=choice_text,
-                is_correct=(j == q_data['correct_index']),
-                order_index=j
-            )
-            db.session.add(choice)
+                    # 問題タイプを判定（選択肢が2つなら○×、4つなら4択）
+                    question_type = 'true_false' if len(choices_list) == 2 else 'multiple_choice'
 
-    # クイズ3: 上級編（10問）
-    quiz3 = Quiz(
-        creator_id=admin.id,
-        title='【推しの子】上級クイズ',
-        description='伏線と考察に関する上級者向けクイズ',
-        oshi_tag_id=oshinoko_tag.id,
-        difficulty='advanced',
-        is_public=True
-    )
-    db.session.add(quiz3)
-    db.session.flush()
+                    question = Question(
+                        quiz_id=quiz.id,
+                        question_text=question_text,
+                        question_type=question_type,
+                        order_index=q_index,
+                        explanation=explanation
+                    )
+                    db.session.add(question)
+                    db.session.flush()
+                    question_count += 1
 
-    # クイズ3の問題
-    questions_quiz3 = [
-        {
-            'question_text': '星野アイの「嘘」とは何を指す？',
-            'choices': ['本当の気持ちを隠すこと', '子供がいること', '引退すること', '病気のこと'],
-            'correct_index': 0,
-            'explanation': '星野アイの「嘘」は、本当の気持ちを隠して演じることを指します。'
-        },
-        {
-            'question_text': 'アクアの星の目が黒くなる条件は？',
-            'choices': ['怒ったとき', '復讐心が薄れたとき', '嘘をついたとき', '悲しいとき'],
-            'correct_index': 1,
-            'explanation': 'アクアの星の目は復讐心が薄れると黒くなります。'
-        },
-        {
-            'question_text': 'ゴロー先生が殺害された場所は？',
-            'choices': ['病院', '海辺', '山', '街中'],
-            'correct_index': 2,
-            'explanation': 'ゴロー先生は山で殺害されました。'
-        },
-        {
-            'question_text': '原作の連載雑誌は？',
-            'choices': ['週刊少年ジャンプ', '週刊ヤングジャンプ', '月刊コミックジーン', 'ビッグコミックスピリッツ'],
-            'correct_index': 1,
-            'explanation': '【推しの子】は週刊ヤングジャンプで連載されています。'
-        },
-        {
-            'question_text': 'アニメのOP主題歌を歌っているアーティストは？',
-            'choices': ['YOASOBI', 'Ado', 'LiSA', 'Aimer'],
-            'correct_index': 0,
-            'explanation': 'アニメのOP主題歌「アイドル」はYOASOBIが歌っています。'
-        },
-        {
-            'question_text': '原作者の赤坂アカの前作品は？',
-            'choices': ['かぐや様は告らせたい', '五等分の花嫁', 'ぼっち・ざ・ろっく', '僕のヒーローアカデミア'],
-            'correct_index': 0,
-            'explanation': '赤坂アカの前作品は「かぐや様は告らせたい」です。'
-        },
-        {
-            'question_text': '作画担当の横槍メンゴの前作品は？',
-            'choices': ['クズの本懐', '五等分の花嫁', 'ドメスティックな彼女', '君に届け'],
-            'correct_index': 0,
-            'explanation': '横槍メンゴの前作品は「クズの本懐」です。'
-        },
-        {
-            'question_text': 'アニメ制作会社は？',
-            'choices': ['京都アニメーション', '動画工房', 'ufotable', 'A-1 Pictures'],
-            'correct_index': 1,
-            'explanation': 'アニメは動画工房が制作しています。'
-        },
-        {
-            'question_text': '星野アイの声優は？',
-            'choices': ['高橋李依', '雨宮天', '早見沙織', '水瀬いのり'],
-            'correct_index': 1,
-            'explanation': '星野アイの声優は雨宮天さんです。'
-        },
-        {
-            'question_text': 'アクアの声優は？',
-            'choices': ['梶裕貴', '大塚剛央', '内山昂輝', '花江夏樹'],
-            'correct_index': 1,
-            'explanation': 'アクアの声優は大塚剛央さんです。'
-        }
-    ]
+                    # 選択肢を作成
+                    correct_index = ord(correct_answer) - ord('A')  # A=0, B=1, C=2, D=3
 
-    for i, q_data in enumerate(questions_quiz3):
-        question = Question(
-            quiz_id=quiz3.id,
-            question_text=q_data['question_text'],
-            question_type='multiple_choice',
-            order_index=i,
-            explanation=q_data['explanation']
-        )
-        db.session.add(question)
-        db.session.flush()
+                    for c_index, choice_text in enumerate(choices_list):
+                        is_correct = (c_index == correct_index)
 
-        for j, choice_text in enumerate(q_data['choices']):
-            choice = Choice(
-                question_id=question.id,
-                choice_text=choice_text,
-                is_correct=(j == q_data['correct_index']),
-                order_index=j
-            )
-            db.session.add(choice)
+                        choice = Choice(
+                            question_id=question.id,
+                            choice_text=choice_text,
+                            is_correct=is_correct,
+                            order_index=c_index
+                        )
+                        db.session.add(choice)
 
-    db.session.commit()
-    print('✅ 軽量版シードデータの投入が完了しました（30問）')
-    print(f'クイズ数: 3')
-    print(f'問題数: 30')
+                # バッチごとにコミット（メモリ解放）
+                db.session.commit()
+                print(f'      ✓ 問題 {batch_start + 1}~{batch_end} を投入完了')
+
+                # メモリ解放のため少し待機（無料プラン対策）
+                if batch_end < total_questions:
+                    time.sleep(0.1)
+
+    print('\n✅ 【推しの子】クイズデータの投入が完了しました！')
+    print(f'   - クイズ数: {quiz_count}個')
+    print(f'   - 総問題数: {question_count}問')
+
+def seed_data():
+    """
+    メイン関数：バッチサイズ5で実行
+    """
+    seed_data_batch(batch_size=5)
 
 if __name__ == '__main__':
     from src.main import app
