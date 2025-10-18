@@ -16,7 +16,7 @@ const setUserId = (id) => localStorage.setItem('userId', id)
 
 function App() {
   return (
-    <Router basename="/oshi-quiz-app">
+    <Router>
       <div className="min-h-screen bg-oshinoko-dark custom-scrollbar">
         <Header />
         <main className="container mx-auto px-4 py-8">
@@ -112,7 +112,7 @@ function HomePage() {
         <div className="flex justify-center mb-6">
           <div className="relative w-full max-w-md">
             <img
-              src={`${import.meta.env.BASE_URL}main-sp.png`}
+              src="/main-sp.png"
               alt="【推しの子】メインビジュアル"
               className="w-full h-auto rounded-2xl shadow-2xl"
             />
