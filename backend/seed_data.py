@@ -1,5 +1,5 @@
 """
-100問版シードデータ - 無料プラン対応（バッチ処理）
+100問版シードデータ - Professional Plan対応（バッチ処理）
 推しの子クイズ（100問）を段階的に投入
 """
 import os
@@ -13,12 +13,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from src.models.user import db, User
 from src.models.quiz import Quiz, Question, Choice, OshiTag
 
-def seed_data_batch(batch_size=5):
+def seed_data_batch(batch_size=20):
     """
-    バッチ処理でシードデータを投入（無料プラン対応）
+    バッチ処理でシードデータを投入（Professional Plan対応）
 
     Args:
-        batch_size: 一度に処理する問題数（デフォルト5問）
+        batch_size: 一度に処理する問題数（デフォルト20問）
     """
 
     # ユーザーを作成
@@ -146,9 +146,9 @@ def seed_data_batch(batch_size=5):
 
 def seed_data():
     """
-    メイン関数：バッチサイズ5で実行
+    メイン関数：バッチサイズ20で実行（Professional Plan対応）
     """
-    seed_data_batch(batch_size=5)
+    seed_data_batch(batch_size=20)
 
 if __name__ == '__main__':
     from src.main import app
